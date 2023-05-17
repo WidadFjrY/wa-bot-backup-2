@@ -47,7 +47,6 @@ client.on("auth_failure", (msg) => {
 client.initialize();
 
 client.on("message", async (message) => {
-  console.log(message.from);
   const sql = "SELECT number FROM users";
   let sender = (await message.getContact()).pushname;
   let number = message.from.split("@")[0];

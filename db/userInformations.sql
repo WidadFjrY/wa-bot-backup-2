@@ -2,6 +2,10 @@
 
 UPDATE users SET countion = 0 WHERE number = "082127264639";
 
+ALTER TABLE users
+ADD
+    COLUMN isBlocked BOOLEAN NOT NULL DEFAULT false;
+
 ALTER TABLE users RENAME COLUMN caution TO countion;
 
 SELECT * FROM users;
