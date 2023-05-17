@@ -15,6 +15,9 @@ const sendingMessage = require("./lib/sending-message");
 const tiktokDownloader = require("./lib/handler/tiktok-downloader");
 const infoUser = require("./lib/handler/infoUser");
 const db = require("./db/db_config");
+const admin = require("./lib/handler/admin");
+const countion = require("./lib/handler/countion");
+const fs = require("fs");
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -44,6 +47,7 @@ client.on("auth_failure", (msg) => {
 client.initialize();
 
 client.on("message", async (message) => {
+  console.log(message.from);
   const sql = "SELECT number FROM users";
   let sender = (await message.getContact()).pushname;
   let number = message.from.split("@")[0];
@@ -95,6 +99,24 @@ client.on("message", async (message) => {
   console.log("Pesan\t\t:", message.body);
   console.log("Media\t\t:", message.hasMedia);
 
+  messageIf(message, client, sender, newNumber);
+  checkSpam(client, message, message.from, sender, newNumber);
+});
+
+async function messageIf(message, client, sender, newNumber) {
+  let isBanned = false;
+  try {
+    isBanned = await countion(client, message, newNumber, sender);
+  } catch (err) {
+    console.error(err);
+    return;
+  }
+
+  if (!isBanned) {
+    console.log("user diban");
+    return;
+  }
+
   if (
     message.body.toLowerCase() === "halo" ||
     message.body.toLowerCase() === "p" ||
@@ -102,6 +124,17 @@ client.on("message", async (message) => {
     message.body.toLowerCase() === "hei"
   ) {
     greeting(client, message.from, sender);
+  } else if (message.body.startsWith("/admin ")) {
+    admin(client, message, newNumber, sender);
+  } else if (message.body === "/admin") {
+    fs.readFile("./text/admin.txt", "utf8", (err, data) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+      client.sendMessage(message.from, data);
+      sendingMessage(sender, data);
+    });
   } else if (message.body === "/notes") {
     notes(client, message.from, sender);
   } else if (message.body.startsWith("/ytmp4 ")) {
@@ -180,7 +213,7 @@ client.on("message", async (message) => {
     }
   } else if (message.body === "/about") {
     const content = [
-      "*CHAT BOT WA*\nVersion : V1.0.0 (Stable)\nMaintainer : WidadFjrY @_widadfjry\nTester :\n  - Nda @nda.xyz_\n  - Anang AW @aari.wb",
+      "*CHAT BOT WA*\nVersion : V1.1.0 (Stable)\nMaintainer : WidadFjrY @_widadfjry\nTester :\n  - Nda @nda.xyz_\n  - Anang AW @aari.wb",
       "Hubungi saya jika ada masukan atau masalah(bug)\nwa.me/6282127264639",
     ];
     client.sendMessage(message.from, content[0]).then(() => {
@@ -190,8 +223,62 @@ client.on("message", async (message) => {
   } else if (message.body === "/infouser") {
     infoUser(client, message, sender);
   } else {
-    const content = "Printah tidak dikenali, ketik /notes untuk mebuka catatan";
-    message.reply(content);
-    sendingMessage(sender, content);
+    client.sendMessage(
+      message.from,
+      "Perintah tidak dikenali, ketik /notes untuk membuka catatan"
+    );
+    sendingMessage(
+      sender,
+      "Perintah tidak dikenali, ketik /notes untuk membuka catatan"
+    );
   }
-});
+}
+
+const spamCount = {};
+
+function checkSpam(client, message, number, pushname, newNumber) {
+  const currentTime = new Date().getTime();
+  const timeWindow = 5000;
+
+  if (!spamCount[number]) {
+    spamCount[number] = {
+      count: 1,
+      lastMessageTime: currentTime,
+    };
+  } else {
+    const lastMessageTime = spamCount[number].lastMessageTime;
+    const elapsedTime = currentTime - lastMessageTime;
+
+    if (elapsedTime <= timeWindow) {
+      spamCount[number].count++;
+      if (spamCount[number].count >= 5) {
+        db.query(
+          `UPDATE users SET countion = countion + 1 WHERE number = ?`,
+          [newNumber],
+          (err, res) => {
+            console.log(err);
+          }
+        );
+        db.query(
+          "SELECT countion FROM users WHERE number = ?",
+          [newNumber],
+          (err, res) => {
+            for (let i = 0; i < res.length; i++) {
+              const countion = res[i].countion;
+              client.sendMessage(
+                message.from,
+                `*⚠️PERINGATAN PROTEKSI SPAM⚠️*\nNama: ${pushname}\nPelanggaran: ${countion}/2`
+              );
+            }
+          }
+        );
+        spamCount[number].count = 0;
+      }
+    } else {
+      spamCount[number] = {
+        count: 1,
+        lastMessageTime: currentTime,
+      };
+    }
+  }
+}

@@ -14,6 +14,7 @@ Catatan di bot ini
 *Lain-lain*
 1. Image to Stricker (/imgtostkr)
 2. Ringkasan Pengguna (/infouser)
-2. About (/about)
+3. About (/about)
+4. Admin Menu (/admin)
 
 Gunakan / saat memanggil. Contoh /ytmp4
